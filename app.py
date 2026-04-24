@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from datetime import datetime
@@ -10,6 +11,7 @@ import json
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
 # conecta no Mongo
 client = MongoClient(os.getenv("MONGO_URI"))
