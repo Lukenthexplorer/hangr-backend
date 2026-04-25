@@ -70,6 +70,15 @@ def get_categorias_filhas():
 # USUARIOS
 # =========================
 
+@app.route("/usuarios", methods=["GET"])
+def listar_usuarios():
+    usuarios = list(db.usuarios.find())
+    for u in usuarios:
+        u["_id"] = str(u["_id"])
+        if "criado_em" in u and not isinstance(u["criado_em"], str):
+            u["criado_em"] = u["criado_em"].isoformat() + "Z"
+    return {"usuarios": usuarios, "total": len(usuarios)}
+
 @app.route("/usuarios", methods=["POST"])
 def criar_usuario():
     data = request.get_json()
@@ -77,10 +86,20 @@ def criar_usuario():
     if not data:
         return {"erro": "JSON inválido"}, 400
 
+    nome   = data.get("nome", "").strip()
+    email  = data.get("email", "").strip().lower()
+    cidade = data.get("cidade", "").strip()
+
+    if not nome or not email or not cidade:
+        return {"erro": "nome, email e cidade são obrigatórios"}, 400
+
+    if db.usuarios.find_one({"email": email}):
+        return {"erro": "Email já cadastrado."}, 409
+
     usuario = {
-        "nome": data.get("nome"),
-        "email": data.get("email"),
-        "cidade": data.get("cidade"),
+        "nome": nome,
+        "email": email,
+        "cidade": cidade,
         "avatar_url": "",
         "criado_em": datetime.utcnow(),
         "ativo": True
