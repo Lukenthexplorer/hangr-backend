@@ -3,6 +3,7 @@ from flask_cors import CORS
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from datetime import datetime
+import certifi
 import os
 import subprocess
 import json
@@ -14,7 +15,7 @@ app = Flask(__name__)
 CORS(app)
 
 # conecta no Mongo
-client = MongoClient(os.getenv("MONGO_URI"))
+client = MongoClient(os.getenv("MONGO_URI"), tlsCAFile=certifi.where())
 db = client[os.getenv("DB_NAME")]
 
 @app.route("/")
