@@ -3,6 +3,7 @@ from flask_cors import CORS
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 import certifi
 import os
 import subprocess
@@ -86,12 +87,15 @@ def criar_usuario():
     if not data:
         return {"erro": "JSON inválido"}, 400
 
-    nome   = data.get("nome", "").strip()
-    email  = data.get("email", "").strip().lower()
-    cidade = data.get("cidade", "").strip()
+    nome  = data.get("nome", "").strip()
+    email = data.get("email", "").strip().lower()
+    senha = data.get("senha", "").strip()
 
-    if not nome or not email or not cidade:
-        return {"erro": "nome, email e cidade são obrigatórios"}, 400
+    if not nome or not email or not senha:
+        return {"erro": "nome, email e senha são obrigatórios"}, 400
+
+    if len(senha) < 6:
+        return {"erro": "Senha deve ter no mínimo 6 caracteres."}, 400
 
     if db.usuarios.find_one({"email": email}):
         return {"erro": "Email já cadastrado."}, 409
@@ -99,8 +103,9 @@ def criar_usuario():
     usuario = {
         "nome": nome,
         "email": email,
-        "cidade": cidade,
+        "cidade": data.get("cidade", "").strip(),
         "avatar_url": "",
+        "senha_hash": generate_password_hash(senha),
         "criado_em": datetime.utcnow(),
         "ativo": True
     }
@@ -109,8 +114,35 @@ def criar_usuario():
 
     usuario["_id"] = str(result.inserted_id)
     usuario["criado_em"] = usuario["criado_em"].isoformat() + "Z"
+    del usuario["senha_hash"]
 
     return {"usuario": usuario}, 201
+
+
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
+    if not data:
+        return {"erro": "JSON inválido"}, 400
+
+    email = data.get("email", "").strip().lower()
+    senha = data.get("senha", "").strip()
+
+    if not email or not senha:
+        return {"erro": "email e senha são obrigatórios"}, 400
+
+    usuario = db.usuarios.find_one({"email": email})
+
+    if not usuario or not check_password_hash(usuario.get("senha_hash", ""), senha):
+        return {"erro": "Email ou senha incorretos."}, 401
+
+    usuario["_id"] = str(usuario["_id"])
+    if "criado_em" in usuario and not isinstance(usuario["criado_em"], str):
+        usuario["criado_em"] = usuario["criado_em"].isoformat() + "Z"
+    del usuario["senha_hash"]
+
+    return {"usuario": usuario}
 
 # =========================
 # PREFERENCIAS USUARIO
