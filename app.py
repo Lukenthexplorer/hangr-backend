@@ -11,6 +11,7 @@ import subprocess
 import json
 import requests as http_requests
 from urllib.parse import quote as url_quote
+from triangulator import calcular_centro
 
 
 load_dotenv()
@@ -408,11 +409,13 @@ def adicionar_membro_party():
         return {"membro": existing}, 200
 
     membro = {
-        "party_id": party_id,
-        "usuario_id": usuario_id,
-        "papel": data.get("papel", "member"),
+        "party_id":        party_id,
+        "usuario_id":      usuario_id,
+        "papel":           data.get("papel", "member"),
         "status_resposta": "pending",
-        "entrou_em": datetime.utcnow()
+        "entrou_em":       datetime.utcnow(),
+        "lat":             data.get("lat"),
+        "lng":             data.get("lng"),
     }
 
     result = db.party_membros.insert_one(membro)
@@ -551,14 +554,32 @@ def explorar_lugares():
     if not api_key:
         return {"erro": "Foursquare API key não configurada"}, 500
 
+    # ── Triangulação ──────────────────────────────────────────────────────────
+    membros_db = list(db.party_membros.find({"party_id": party_id}))
+    triangulo  = calcular_centro(membros_db, raio_metros=2000)
+
     fields = "fsq_place_id,name,location,categories,distance,tel,website,social_media"
-    url = (
-        f"https://places-api.foursquare.com/places/search"
-        f"?query={url_quote(query)}"
-        f"&near={url_quote(city)}"
-        f"&limit={limit}"
-        f"&fields={fields}"
-    )
+
+    if triangulo:
+        # Busca por coordenadas precisas
+        c = triangulo["centro_busca"]
+        url = (
+            f"https://places-api.foursquare.com/places/search"
+            f"?query={url_quote(query)}"
+            f"&ll={c['lat']},{c['lng']}"
+            f"&radius={triangulo['raio_final']}"
+            f"&limit={limit}"
+            f"&fields={fields}"
+        )
+    else:
+        # Fallback: busca por nome da cidade
+        url = (
+            f"https://places-api.foursquare.com/places/search"
+            f"?query={url_quote(query)}"
+            f"&near={url_quote(city)}"
+            f"&limit={limit}"
+            f"&fields={fields}"
+        )
 
     try:
         resp = http_requests.get(url, headers={
@@ -598,7 +619,26 @@ def explorar_lugares():
             "instagram": place.get("social_media", {}).get("instagram"),
         })
 
-    return {"lugares": lugares, "cidade": city}
+    return {
+        "lugares":      lugares,
+        "cidade":       city,
+        "triangulacao": triangulo,
+    }
+
+
+@app.route("/triangulate", methods=["GET"])
+def triangulate():
+    party_id = request.args.get("party_id", "").strip()
+    if not party_id:
+        return {"erro": "party_id é obrigatório"}, 400
+
+    membros_db = list(db.party_membros.find({"party_id": party_id}))
+    resultado  = calcular_centro(membros_db, raio_metros=2000)
+
+    if not resultado:
+        return {"triangulacao": None, "mensagem": "Nenhum membro com localização"}, 200
+
+    return {"triangulacao": resultado}
 
 
 # =========================
