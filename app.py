@@ -9,6 +9,8 @@ import certifi
 import os
 import subprocess
 import json
+import requests as http_requests
+from urllib.parse import quote as url_quote
 
 
 load_dotenv()
@@ -506,6 +508,98 @@ def calcular_match(party_id):
         "total_membros": len(membros),
         "total_votaram": len(votantes)
     }
+
+# =========================
+# EXPLORAR LUGARES (FOURSQUARE)
+# =========================
+
+SLUG_QUERY = {
+    "restaurantes": "restaurante",
+    "bares":        "bar",
+    "cafes":        "café",
+    "jogos":        "arcade videogame",
+    "parque":       "parque",
+    "esportes":     "academia esporte",
+}
+
+@app.route("/lugares", methods=["GET"])
+def explorar_lugares():
+    party_id = request.args.get("party_id", "").strip()
+    slug     = request.args.get("slug", "").strip()
+    limit    = request.args.get("limit", "10")
+
+    if not party_id or not slug:
+        return {"erro": "party_id e slug são obrigatórios"}, 400
+
+    query = SLUG_QUERY.get(slug)
+    if not query:
+        return {"erro": "slug inválido"}, 400
+
+    try:
+        party = db.parties.find_one({"_id": ObjectId(party_id)})
+    except Exception:
+        return {"erro": "party_id inválido"}, 400
+
+    if not party:
+        return {"erro": "Party não encontrada"}, 404
+
+    city = party.get("cidade", "")
+    if not city:
+        return {"erro": "Party sem cidade definida"}, 400
+
+    api_key = os.getenv("FOURSQUARE_API_KEY")
+    if not api_key:
+        return {"erro": "Foursquare API key não configurada"}, 500
+
+    fields = "fsq_place_id,name,location,categories,distance,tel,website,social_media"
+    url = (
+        f"https://places-api.foursquare.com/places/search"
+        f"?query={url_quote(query)}"
+        f"&near={url_quote(city)}"
+        f"&limit={limit}"
+        f"&fields={fields}"
+    )
+
+    try:
+        resp = http_requests.get(url, headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "X-Places-Api-Version": "2025-06-17",
+        }, timeout=10)
+    except Exception as e:
+        return {"erro": f"Falha ao contatar Foursquare: {str(e)}"}, 502
+
+    data = resp.json()
+
+    if not resp.ok:
+        return {"erro": data.get("message", "Erro na Foursquare API")}, resp.status_code
+
+    lugares = []
+    for place in data.get("results", []):
+        cat  = place.get("categories", [{}])[0] if place.get("categories") else {}
+        icon = cat.get("icon", {})
+        icon_url = (icon["prefix"] + "88" + icon["suffix"]) if icon.get("prefix") else None
+
+        dist_m = place.get("distance")
+        if dist_m is not None:
+            distancia = f"{dist_m}m" if dist_m < 1000 else f"{dist_m / 1000:.1f}km"
+        else:
+            distancia = None
+
+        lugares.append({
+            "id":        place.get("fsq_place_id"),
+            "nome":      place.get("name"),
+            "endereco":  place.get("location", {}).get("formatted_address"),
+            "categoria": cat.get("name"),
+            "icone":     icon_url,
+            "distancia": distancia,
+            "tel":       place.get("tel"),
+            "website":   place.get("website"),
+            "instagram": place.get("social_media", {}).get("instagram"),
+        })
+
+    return {"lugares": lugares, "cidade": city}
+
 
 # =========================
 # BUSCAR LUGARES (MOCK)
