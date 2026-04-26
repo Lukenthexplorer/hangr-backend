@@ -144,6 +144,35 @@ def login():
 
     return {"usuario": usuario}
 
+@app.route("/usuarios/<id>", methods=["PATCH"])
+def atualizar_usuario(id):
+    from bson import ObjectId
+    data = request.get_json()
+    if not data:
+        return {"erro": "JSON inválido"}, 400
+
+    campos_permitidos = {"nome", "cidade", "avatar_url"}
+    update = {k: v for k, v in data.items() if k in campos_permitidos}
+
+    if not update:
+        return {"erro": "Nenhum campo válido para atualizar"}, 400
+
+    result = db.usuarios.find_one_and_update(
+        {"_id": ObjectId(id)},
+        {"$set": update},
+        return_document=True
+    )
+
+    if not result:
+        return {"erro": "Usuário não encontrado"}, 404
+
+    result["_id"] = str(result["_id"])
+    if "criado_em" in result and not isinstance(result["criado_em"], str):
+        result["criado_em"] = result["criado_em"].isoformat() + "Z"
+    result.pop("senha_hash", None)
+
+    return {"usuario": result}
+
 # =========================
 # PREFERENCIAS USUARIO
 # =========================
