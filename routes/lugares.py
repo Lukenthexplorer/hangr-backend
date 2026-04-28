@@ -81,7 +81,7 @@ def explorar_lugares():
             raio_busca = triangulo["raio_final"]
             modo_busca = "triangulacao"
 
-    fields = "fsq_place_id,name,location,geocodes,categories,distance,tel,website,social_media"
+    fields = "fsq_place_id,name,location,categories,distance,tel,website,social_media"
 
     if centro:
         url = (
@@ -126,17 +126,20 @@ def explorar_lugares():
         else:
             distancia = None
 
+        loc      = place.get("location", {})
         geo_main = place.get("geocodes", {}).get("main", {})
+        lat = geo_main.get("latitude")  or loc.get("lat")
+        lng = geo_main.get("longitude") or loc.get("lng")
 
         lugares.append({
             "id":        place.get("fsq_place_id"),
             "nome":      place.get("name"),
-            "endereco":  place.get("location", {}).get("formatted_address"),
+            "endereco":  loc.get("formatted_address"),
             "categoria": cat.get("name"),
             "icone":     icon_url,
             "distancia": distancia,
-            "lat":       geo_main.get("latitude"),
-            "lng":       geo_main.get("longitude"),
+            "lat":       lat,
+            "lng":       lng,
             "tel":       place.get("tel"),
             "website":   place.get("website"),
             "instagram": place.get("social_media", {}).get("instagram"),
