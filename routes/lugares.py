@@ -81,8 +81,6 @@ def explorar_lugares():
             raio_busca = triangulo["raio_final"]
             modo_busca = "triangulacao"
 
-    fields = "fsq_place_id,name,location,categories,distance,tel,website,social_media"
-
     if centro:
         url = (
             f"https://places-api.foursquare.com/places/search"
@@ -90,7 +88,6 @@ def explorar_lugares():
             f"&ll={centro['lat']},{centro['lng']}"
             f"&radius={raio_busca}"
             f"&limit={limit}"
-            f"&fields={fields}"
         )
     else:
         url = (
@@ -98,7 +95,6 @@ def explorar_lugares():
             f"?query={url_quote(query)}"
             f"&near={url_quote(city)}"
             f"&limit={limit}"
-            f"&fields={fields}"
         )
 
     try:
