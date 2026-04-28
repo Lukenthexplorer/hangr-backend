@@ -122,10 +122,9 @@ def explorar_lugares():
         else:
             distancia = None
 
-        loc      = place.get("location", {})
-        geo_main = place.get("geocodes", {}).get("main", {})
-        lat = geo_main.get("latitude")  or loc.get("lat")
-        lng = geo_main.get("longitude") or loc.get("lng")
+        loc = place.get("location", {})
+        lat = place.get("latitude")
+        lng = place.get("longitude")
 
         lugares.append({
             "id":        place.get("fsq_place_id"),
