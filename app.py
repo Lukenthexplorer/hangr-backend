@@ -7,8 +7,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from bson import ObjectId
 import certifi
 import os
-import subprocess
-import json
 
 
 load_dotenv()
@@ -151,7 +149,7 @@ def atualizar_usuario(id):
     if not data:
         return {"erro": "JSON inválido"}, 400
 
-    campos_permitidos = {"nome", "cidade", "avatar_url"}
+    campos_permitidos = {"nome", "cidade", "avatar_url", "genero", "data_nascimento"}
     update = {k: v for k, v in data.items() if k in campos_permitidos}
 
     if not update:
@@ -409,6 +407,9 @@ def criar_party_preferencias():
     if not preferencias:
         return {"erro": "Nenhuma categoria válida foi enviada"}, 400
 
+    # remove votos anteriores do mesmo usuário nessa party (permite revotar)
+    db.party_preferencias.delete_many({"party_id": party_id, "usuario_id": usuario_id})
+
     result = db.party_preferencias.insert_many(preferencias)
 
     return {
@@ -482,30 +483,6 @@ def buscar_lugares():
         "lugares": lugares_mock
     }
 
-# =========================
-# QUATRO QUADRADOS
-# =========================
-
-
-@app.route("/foursquare")
-def buscar_foursquare():
-    query = request.args.get("query", "sushi")
-    cidade = request.args.get("cidade", "Sao Paulo")
-
-    result = subprocess.run(
-        ["node", "hangr-backend/foursquare.js", query, cidade],
-        capture_output=True,
-        text=True
-    )
-
-    if result.returncode != 0:
-        return {
-            "erro": "Node falhou",
-            "stderr": result.stderr,
-            "stdout": result.stdout
-        }, 500
-
-    return result.stdout, 200, {"Content-Type": "application/json"}
 
 if __name__ == "__main__":
     app.run(debug=True, port=8000)
