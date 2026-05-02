@@ -79,7 +79,7 @@ def atualizar_usuario(id):
     if not data:
         return {"erro": "JSON inválido"}, 400
 
-    campos_permitidos = {"nome", "cidade", "avatar_url"}
+    campos_permitidos = {"nome", "cidade", "avatar_url", "genero", "data_nascimento"}
     update = {k: v for k, v in data.items() if k in campos_permitidos}
     if not update:
         return {"erro": "Nenhum campo válido para atualizar"}, 400
