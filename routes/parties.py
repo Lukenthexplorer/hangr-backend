@@ -238,12 +238,20 @@ def calcular_match(codigo):
 
     ranking = sorted(contagem.items(), key=lambda x: x[1], reverse=True)
 
-    return {
+    resultado = {
         "match":         ranking[0][0] if ranking else None,
         "ranking":       [{"slug": k, "votos": v} for k, v in ranking],
         "total_membros": len(party.get("membros", [])),
         "total_votaram": len(votantes),
     }
+
+    # Persiste para que o poll dos outros membros detecte o hang
+    db.parties.update_one(
+        {"codigo_convite": codigo.upper()},
+        {"$set": {"match": resultado, "hang_em": datetime.utcnow()}},
+    )
+
+    return resultado
 
 
 # ── Chat ─────────────────────────────────────────────────────────────────
