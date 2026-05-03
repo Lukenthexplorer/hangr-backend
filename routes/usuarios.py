@@ -1,8 +1,13 @@
 from flask import Blueprint, request
 from werkzeug.security import generate_password_hash, check_password_hash
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 from bson import ObjectId
 from datetime import datetime
 from db import db
+import os
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 bp = Blueprint('usuarios', __name__)
 
@@ -97,6 +102,57 @@ def atualizar_usuario(id):
         return {"erro": "Usuário não encontrado"}, 404
 
     return {"usuario": _serialize(result)}
+
+
+@bp.route("/login/google", methods=["POST"])
+def login_google():
+    data = request.get_json()
+    if not data:
+        return {"erro": "JSON inválido"}, 400
+
+    credential = data.get("credential")
+    if not credential:
+        return {"erro": "credential é obrigatório"}, 400
+
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID,
+        )
+    except Exception:
+        return {"erro": "Token do Google inválido"}, 401
+
+    email     = idinfo.get("email", "").strip().lower()
+    nome      = idinfo.get("name", "")
+    google_id = idinfo.get("sub", "")
+
+    if not email:
+        return {"erro": "Email não disponível"}, 400
+
+    usuario = db.usuarios.find_one({"email": email})
+    novo = False
+
+    if not usuario:
+        novo = True
+        doc = {
+            "nome":       nome,
+            "email":      email,
+            "cidade":     "",
+            "avatar_url": "",
+            "google_id":  google_id,
+            "criado_em":  datetime.utcnow(),
+            "ativo":      True,
+        }
+        result = db.usuarios.insert_one(doc)
+        usuario = db.usuarios.find_one({"_id": result.inserted_id})
+    elif not usuario.get("google_id"):
+        db.usuarios.update_one(
+            {"_id": usuario["_id"]},
+            {"$set": {"google_id": google_id}},
+        )
+
+    return {"usuario": _serialize(usuario), "novo": novo}
 
 
 @bp.route("/preferencias_usuario", methods=["POST"])
