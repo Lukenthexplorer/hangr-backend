@@ -2,9 +2,9 @@
 
 API REST em Flask para o Hangr, app de decisão de rolê em grupo.
 
-**API em produção:** http://hangr.com.br/api
+**API em produção:** https://hangr.com.br/api
 
-**Frontend em produção:** http://hangr.com.br
+**Frontend em produção:** https://hangr.com.br
 
 ## Stack
 
