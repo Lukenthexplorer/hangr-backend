@@ -155,6 +155,25 @@ def login_google():
     return {"usuario": _serialize(usuario), "novo": novo}
 
 
+@bp.route("/usuarios/<id>", methods=["DELETE"])
+def apagar_usuario(id):
+    try:
+        oid = ObjectId(id)
+    except Exception:
+        return {"erro": "ID inválido"}, 400
+
+    if not db.usuarios.find_one({"_id": oid}):
+        return {"erro": "Usuário não encontrado"}, 404
+
+    db.usuarios.delete_one({"_id": oid})
+    db.preferencias_usuario.delete_many({"usuario_id": id})
+    db.parties.update_many(
+        {"membros.usuario_id": id},
+        {"$pull": {"membros": {"usuario_id": id}}},
+    )
+    return {"mensagem": "Conta apagada com sucesso"}, 200
+
+
 @bp.route("/preferencias_usuario", methods=["POST"])
 def salvar_preferencias():
     data = request.get_json()
